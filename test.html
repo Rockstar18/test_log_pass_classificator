@@ -1,0 +1,263 @@
+<html>
+    <body>
+        <div>
+            <label>Login</label><br>
+            <input type="text" id="login" onchange="changeHandler()"><br>
+            <label>Password</label><br>
+            <input type="password" id="pass"><br>
+            <input type="submit" id="enter" onclick="submitHandler()">
+            <div id="result"></div>
+        </div>
+        <canvas id="logChart" width="1000" height="400"></canvas>
+        <canvas id="passChart" width="1000" height="400"></canvas>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.js"></script>
+        <script>
+            var ACCURACY_CONST = 200; // константа точности для классификатора
+
+            var inputLogin = document.getElementById('login');
+            var inputPass = document.getElementById('pass');
+            var ctxLog = document.getElementById("logChart").getContext('2d');
+            var ctxPass = document.getElementById("passChart").getContext('2d');
+
+
+            var chartLogin = 0;
+            var chartPassword = 0;
+
+            var flagLog = 1;
+            var flagPass = 1;
+            var logArr = [];
+            var passArr = [];
+            var login = "";
+            var password = "";
+            var timePoint = 0;
+            var chart = 0;
+            var piLabelsArray = ['-3', '-2', '-1', '0', '1', '2', '3'];
+            var tArray = [-3, -2, -1, 0, 1, 2, 3];
+            var logClassData = [];
+            var passClassData = [];
+            var tryCounter = 1;
+
+            document.onkeyup = function (e) { // отлавливает нажатие ентер
+                e = e || window.event;
+                if (e.keyCode === 13) {
+                    submitHandler();
+                }
+                return false;
+            };
+
+            function andrewsPlot(x, t) { //функция вычисляет значения точек в диграмме Эндрюса, проще говоря вычисляет ряд фурье для каждого значения интервала от -Пи до Пи
+                var curve = [];
+                var point = [];
+                for (var i = 0; i < t.length; i++){
+                    var flagSinCos = 1;
+                    var countSinCos = 1;
+                    point = x[0] + Math.sqrt(2);
+                    for (var j = 1; j < x.length; j++) {
+                        if (flagSinCos){
+                            flagSinCos = 0;
+                            point += x[j] * Math.sin(countSinCos * t[i]);
+                        } else {
+                            flagSinCos = 1;
+                            point += x[j] * Math.cos(countSinCos * t[i]);
+                            countSinCos ++;
+                        }
+                    }
+                    curve.push(point);
+                }
+                return curve;
+            }
+
+            function submitHandler() { //функция срабатывает при нажании на ентер или кнопку отправки формы
+                var i;
+                ///
+                // проверка пароля и логина на соответсвие занесенным в систему
+                ///
+                if ((password != "") && (password.localeCompare(inputPass.value) != 0)){
+                    document.getElementById('result').textContent = 'access denied (password)';
+                    flagPass = 1;
+                    flagLog = 1;
+                    logArr = [];
+                    passArr = [];
+                    return;
+                }
+                if ((login != "") && (login.localeCompare(inputLogin.value) != 0)){
+                    document.getElementById('result').textContent = 'access denied (login)';
+                    flagPass = 1;
+                    flagLog = 1;
+                    logArr = [];
+                    passArr = [];
+                    return;
+                }
+                password = inputPass.value;
+                login = inputLogin.value;
+                var plotData;
+                var bufArray;
+                var dataLogin;
+                var dataPass;
+                ///
+                // заносим данные в массив для графика логинов
+                // выполняется классификация для логина
+                ///
+                if (logArr.length != 0){
+                    plotData = andrewsPlot(logArr, tArray);
+                    if (logClassData.length != 0) {
+                        bufArray = makeClassArray(plotData);
+                        if (calcAvgIntervals(logClassData, bufArray) > ACCURACY_CONST) {
+                            document.getElementById('result').textContent = 'access denied log';
+                        } else {
+                            document.getElementById('result').textContent = 'access granted';
+                            for(i = 0; i < logClassData.length; i ++) {
+                                logClassData[i] = (logClassData[i] + bufArray[i])/2
+                            }
+                        }
+                    } else {
+                        logClassData = makeClassArray(plotData);
+                    }
+
+                    dataLogin = {
+                        label: "Try" + tryCounter,
+                        fill: false,
+                        data: plotData,
+                        borderColor: 'green'
+                    };
+                }
+                ///
+                // заносим данные в массив для графика паролей
+                // выполняется классификация для пароля
+                ///
+                if (passArr.length != 0){
+                    plotData = andrewsPlot(passArr, tArray);
+                    if (passClassData.length != 0) {
+                        bufArray = makeClassArray(plotData);
+                        if (calcAvgIntervals(passClassData, bufArray) > ACCURACY_CONST) {
+                            document.getElementById('result').textContent = 'access denied pass';
+                        } else {
+                            document.getElementById('result').textContent = 'access granted';
+                            for(i = 0; i < passClassData.length; i ++) {
+                                passClassData[i] = (passClassData[i] + bufArray[i])/2
+                            }
+                        }
+                    } else {
+                        passClassData = makeClassArray(plotData);
+                    }
+                    dataPass = {
+                        label: "Try" + tryCounter,
+                        fill: false,
+                        data: plotData,
+                        borderColor: 'red'
+                    };
+                }
+
+                tryCounter ++; // счетчик , чтобы отображать названия графиков с порядковым номером
+
+                ///
+                // рисование графика логинов , если график уже нарисован, то дополняем датасет еще одним массивом значений и обновляем chart
+                ///
+                if (chartLogin == 0) {
+                    var logChartData = {
+                        labels: piLabelsArray,
+                        datasets: [dataLogin]
+                    };
+                    chartLogin = paintLine(logChartData, ctxLog, "Login");
+                } else {
+                    chartLogin.data.datasets.push(dataLogin);
+                    chartLogin.update();
+                }
+                ///
+                // рисование графика паролей , если график уже нарисован, то дополняем датасет еще одним массивом значений и обновляем chart
+                ///
+                if (chartPassword == 0) {
+                    var passChartData = {
+                        labels: piLabelsArray,
+                        datasets: [dataPass]
+                    };
+                    chartPassword = paintLine(passChartData, ctxPass, "Password");
+                } else {
+                    chartPassword.data.datasets.push(dataPass);
+                    chartPassword.update();
+                }
+
+                flagPass = 1;
+                flagLog = 1;
+                logArr = [];
+                passArr = [];
+                return false;
+            }
+
+            function makeClassArray(inArray) { // создает массив для классификатора, вычисляет абсолютное значение дельты между двумя точками входящего массива
+                var len = inArray.length;
+                var outArray = [];
+                for(var i = 0; i < len-1; i++){
+                    outArray.push(Math.abs(inArray[i+1]-inArray[i]));
+                }
+                return outArray;
+            }
+
+            function calcAvgIntervals(firstArr, secondArr){ //вычисление среднего для дельт между первым и вторым массивом данных, используется для оценки классификатора
+                var length = firstArr.length;
+                var limSum = 0;
+                for (var i = 0; i < length; i ++){
+                    limSum += Math.abs(firstArr[i] - secondArr[i]);
+                }
+                return limSum/length;
+            }
+
+            function changeHandler() { // функция для события выхода курсора из поля логина (не используется)
+                return false;
+            }
+
+            ///
+            // две функции для отлавливания ввода данных в поле логина и пароля , вычисляют вруменные интервалы между вводом символов в поля
+            // временные данные заносятся в массив и используются в дальнейшем для построения графиков и классификации
+            ///
+            inputLogin.oninput = function() {
+                var time;
+                if (flagLog) {
+                    flagLog = 0;
+                    time = new Date();
+                    timePoint = time.getTime();
+                } else {
+                    time = new Date();
+                    logArr.push(time.getTime() - timePoint);
+                    timePoint = time.getTime();
+                }
+            };
+
+            inputPass.oninput = function() {
+                var time;
+                if (flagPass) {
+                    flagPass = 0;
+                    time = new Date();
+                    timePoint = time.getTime();
+                } else {
+                    time = new Date();
+                    passArr.push(time.getTime() - timePoint);
+                    timePoint = time.getTime();
+                }
+            };
+
+            function paintLine(chartsData, ctx, title) { //создает объект chart для отображение графика, заносит начальные данные и опции графика
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: chartsData,
+                    options: {
+                        title: {
+                            display: true,
+                            text: title,
+                            fontSize: 21
+                        },
+                        responsive: false,
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: false
+                                }
+                            }]
+                        }
+                    }
+                });
+                return chart;
+            }
+        </script>
+    </body>
+</html>
