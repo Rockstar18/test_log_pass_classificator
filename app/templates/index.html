@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <div>
+            <label>Login</label><br>
+            <input type="text" id="login" onchange="changeHandler()"><br>
+            <label>Password</label><br>
+            <input type="password" id="pass"><br>
+            <input type="submit" id="enter" onclick="submitHandler()">
+            <div id="result"></div>
+        </div>
+        <script>
+            var inputLogin = document.getElementById('login');
+            var inputPass = document.getElementById('pass');
+
+            var logArr = [];
+            var passArr = [];
+
+            var flagLog = 1;
+            var flagPass = 1;
+            var login = "";
+            var password = "";
+            var timePoint = 0;
+
+            document.onkeyup = function (e) {
+                e = e || window.event;
+                if (e.keyCode === 13) {
+                    submitHandler();
+                }
+                return false;
+            };
+
+            function submitHandler() {
+                login = inputLogin.value;
+                password = inputPass.value;
+                let xhr = new XMLHttpRequest();
+                let data = {
+                    'login': login,
+                    'password': password,
+                    'logTimeArray': logArr,
+                    'passTimeArray': passArr
+                };
+                xhr.open('POST', 'login', true);
+                xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+                xhr.send(JSON.stringify(data));
+                xhr.onloadend = function () {
+                    document.getElementById('result').textContent = 'done';
+                    flagPass = 1;
+                    flagLog = 1;
+                    logArr = [];
+                    passArr = [];
+                };
+                return false;
+            }
+
+            inputLogin.oninput = function() {
+                var time;
+                if (flagLog) {
+                    flagLog = 0;
+                    time = new Date();
+                    timePoint = time.getTime();
+                } else {
+                    time = new Date();
+                    logArr.push(time.getTime() - timePoint);
+                    timePoint = time.getTime();
+                }
+            };
+
+            inputPass.oninput = function() {
+                var time;
+                if (flagPass) {
+                    flagPass = 0;
+                    time = new Date();
+                    timePoint = time.getTime();
+                } else {
+                    time = new Date();
+                    passArr.push(time.getTime() - timePoint);
+                    timePoint = time.getTime();
+                }
+            };
+
+        </script>
+    </body>
+</html>
